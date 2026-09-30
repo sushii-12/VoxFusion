@@ -70,23 +70,25 @@ The outputs are passed to an interpretable fusion layer, which produces an overa
 * Component-level outputs and reasons.
 * GSM codec simulation for investigating telephone-style audio degradation.
 
+
 ## Project Structure
 
 ```text
 VoxFusion/
-â”œâ”€â”€ aasist/                   # AASIST source repository
-â”œâ”€â”€ src/
-â”‚   â”œâ”€â”€ deepfake_detection.py  # AASIST inference wrapper
-â”‚   â”œâ”€â”€ speaker_verification.py# ECAPA-TDNN wrapper
-â”‚   â”œâ”€â”€ transcription.py       # faster-whisper transcription
-â”‚   â”œâ”€â”€ scam_intent.py         # Rule-based intent analysis
-â”‚   â””â”€â”€ fusion.py              # Risk fusion and explanations
-â”œâ”€â”€ data/                      # Local audio data (not committed)
-â”œâ”€â”€ results/                   # Local outputs (not committed)
-â”œâ”€â”€ app.py                     # Pipeline entry point
-â”œâ”€â”€ requirements.txt
-â”œâ”€â”€ README.md
-â””â”€â”€ .gitignore
+|-- aasist/                      # AASIST source repository (Git submodule)
+|-- src/
+|   |-- deepfake_detection.py    # AASIST inference wrapper
+|   |-- speaker_verification.py  # ECAPA-TDNN speaker verification
+|   |-- transcription.py         # faster-whisper transcription
+|   |-- scam_intent.py           # Rule-based scam-intent analysis
+|   |-- fusion.py                # Risk fusion and explanations
+|-- data/                        # Local audio data (not committed)
+|-- results/                     # Local outputs (not committed)
+|-- app.py                       # Pipeline entry point
+|-- requirements.txt
+|-- README.md
+|-- .gitignore
+|-- .gitmodules
 ```
 
 ## Setup
