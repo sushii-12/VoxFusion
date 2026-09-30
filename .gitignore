@@ -1,0 +1,24 @@
+# Virtual environment
+env/
+
+# Python cache
+__pycache__/
+*.py[cod]
+
+# Environment variables / secrets
+.env
+
+# Large datasets
+data/
+
+# Downloaded ML models
+models/
+
+# Generated results
+results/
+
+# IDE / OS files
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
