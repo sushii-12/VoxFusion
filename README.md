@@ -2,7 +2,7 @@
 
 **Team:** AltF4
 
-# VoxFusion - Voice-Cloning Scam Detection system designed to identify potential family-emergency scams involving AI-generated or cloned voices. It combines speaker verification, audio deepfake detection, speech transcription, and scam-intent analysis to produce an interpretable risk assessment.
+### VoxFusion - Voice-Cloning Scam Detection system designed to identify potential family-emergency scams involving AI-generated or cloned voices. It combines speaker verification, audio deepfake detection, speech transcription, and scam-intent analysis to produce an interpretable risk assessment.
 
 > **Project status:** The end-to-end V1 pipeline is integrated and executable. Model evaluation, score calibration, and validation on suitable datasets are still in progress.
 
