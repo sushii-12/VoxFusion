@@ -154,12 +154,11 @@ class AASISTDetector:
 
 
 if __name__ == "__main__":
-    test_audio = (
-        PROJECT_ROOT
-        / "data"
-        / "processed"
-        / "test_gsm.wav"
-    )
+    if len(sys.argv) != 2:
+        print("Usage: python -m src.deepfake_detection <audio_path>")
+        raise SystemExit(1)
+
+    test_audio = Path(sys.argv[1])
 
     detector = AASISTDetector()
     result = detector.predict(test_audio)

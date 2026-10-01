@@ -2,6 +2,8 @@ import argparse
 import json
 from pathlib import Path
 
+import soundfile as sf
+
 from src.speaker_verification import SpeakerVerifier
 from src.deepfake_detection import AASISTDetector
 from src.transcription import WhisperTranscriber
@@ -60,9 +62,15 @@ def run_voxfusion(audio_path, reference_audio=None):
     # --------------------------------------------------
     print("\n[2/3] Running AASIST...")
 
-    deepfake_result = deepfake_detector.predict(
-        str(audio_path)
-    )
+    try:
+        deepfake_result = deepfake_detector.predict(
+            str(audio_path)
+        )
+    except sf.LibsndfileError as exc:
+        raise ValueError(
+            f"Unable to read audio file for AASIST: {audio_path}. "
+            "Please provide a valid WAV/audio file."
+        ) from exc
 
     # --------------------------------------------------
     # 3. Whisper transcription + scam-intent analysis
@@ -155,10 +163,13 @@ def main():
 
     args = parser.parse_args()
 
-    run_voxfusion(
-        audio_path=args.audio,
-        reference_audio=args.reference,
-    )
+    try:
+        run_voxfusion(
+            audio_path=args.audio,
+            reference_audio=args.reference,
+        )
+    except ValueError as exc:
+        print(f"\nError: {exc}")
 
 
 if __name__ == "__main__":
