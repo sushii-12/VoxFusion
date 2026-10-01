@@ -21,23 +21,33 @@ class WhisperTranscriber:
     def transcribe(self, audio_path):
         audio_path = str(Path(audio_path))
 
-        segments, info = self.model.transcribe(
-            audio_path,
-            language="en",
-            beam_size=5,
-            vad_filter=True
-        )
+        try:
+            segments, info = self.model.transcribe(
+                audio_path,
+                language="en",
+                beam_size=5,
+                vad_filter=True
+            )
 
-        transcript = " ".join(
-            segment.text.strip()
-            for segment in segments
-        ).strip()
+            transcript = " ".join(
+                segment.text.strip()
+                for segment in segments
+            ).strip()
 
-        return {
-            "transcript": transcript,
-            "language": info.language,
-            "language_probability": float(info.language_probability)
-        }
+            return {
+                "transcript": transcript,
+                "language": info.language,
+                "language_probability": float(info.language_probability)
+            }
+
+        except Exception as e:
+            return {
+                "status": "error",
+                "error": str(e),
+                "transcript": "",
+                "language": None,
+                "language_probability": 0.0
+            }
 
 
 if __name__ == "__main__":
