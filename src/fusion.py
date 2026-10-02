@@ -68,20 +68,20 @@ class FusionEngine:
 
         # 3. Scam-intent analysis
         if intent_result is not None:
-            # ScamIntentAnalyzer returns its score under "score"
-            
-           intent_score = intent_result.get(
+            intent_score = intent_result.get(
                 "scam_intent_score",
                 intent_result.get("score")
             )
 
-        if intent_score is None:
-            raise KeyError(
-                "Could not find intent score. "
-                f"Available keys: {list(intent_result.keys())}"
+            if intent_score is None:
+                raise KeyError(
+                    "Could not find intent score. "
+                    f"Available keys: {list(intent_result.keys())}"
                 )
 
-            intent_score = float(intent_score) 
+            intent_score = float(intent_score)
+
+            # Intent score is expected on a 0-100 scale
             intent_score = max(
                 0.0,
                 min(100.0, intent_score)
@@ -92,13 +92,19 @@ class FusionEngine:
             )
 
             for category in intent_result.get(
-                "matched_categories", []
+                "matched_categories",
+                []
             ):
                 reasons.append(
                     f"Scam-related language detected: {category}."
                 )
 
-        # Keep the final score within 0–100
+        else:
+            reasons.append(
+                "Scam-intent analysis unavailable."
+            )
+
+        # Keep final score within 0-100
         risk_score = round(
             min(max(risk_score, 0.0), 100.0),
             2
