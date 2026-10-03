@@ -48,17 +48,25 @@ class FusionEngine:
 
         # 2. ECAPA-TDNN speaker verification
         if speaker_result is not None:
-            same_speaker = speaker_result["same_speaker"]
+            status = speaker_result.get("status")
+            same_speaker = speaker_result.get("same_speaker")
 
-            if same_speaker:
+            if status == "verified" and same_speaker:
                 reasons.append(
                     "Voice matches the registered speaker."
                 )
-            else:
+
+            elif status == "different_speaker" and not same_speaker:
                 risk_score += self.speaker_mismatch_weight
 
                 reasons.append(
                     "Voice does not match the registered speaker."
+                )
+
+            else:
+                reasons.append(
+                    "Speaker verification not verified: "
+                    "no suitable reference or verification result."
                 )
         else:
             reasons.append(
@@ -91,6 +99,7 @@ class FusionEngine:
                 intent_score * self.intent_weight
             )
 
+            # V1 rule-based intent categories
             for category in intent_result.get(
                 "matched_categories",
                 []
@@ -98,6 +107,18 @@ class FusionEngine:
                 reasons.append(
                     f"Scam-related language detected: {category}."
                 )
+
+            # V2 ML intent result
+            if intent_result.get("status") == "success":
+                if "scam_probability" in intent_result:
+                    probability = float(
+                        intent_result["scam_probability"]
+                    )
+
+                    reasons.append(
+                        f"V2 scam-intent model probability: "
+                        f"{probability:.2f}."
+                    )
 
         else:
             reasons.append(
