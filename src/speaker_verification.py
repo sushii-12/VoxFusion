@@ -13,7 +13,7 @@ from speechbrain.utils.fetching import LocalStrategy
 
 TARGET_SR = 16000
 MIN_REFERENCE_SECONDS = 1.0
-VERIFICATION_THRESHOLD = 0.25
+VERIFICATION_THRESHOLD = 0.2951  # 0.2951 derived from speaker-disjoint LibriSpeech calibration (20 speakers calibration, 20 held-out); provisional threshold, not telephony-domain performance
 
 
 class SpeakerVerifier:
