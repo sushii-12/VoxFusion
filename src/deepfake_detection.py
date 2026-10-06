@@ -29,7 +29,7 @@ MODEL_CONFIG = {
     "temperatures": [2.0, 2.0, 100.0, 100.0],
 }
 
-MODEL_PATH = AASIST_ROOT / "models" / "weights" / "AASIST.pth"
+MODEL_PATH = PROJECT_ROOT / "models" / "AASIST_gsm_finetuned_best.pth"
 
 TARGET_SR = 16000
 NUM_SAMPLES = 64600
@@ -37,7 +37,9 @@ NUM_SAMPLES = 64600
 
 class AASISTDetector:
     def __init__(self):
-        self.device = torch.device("cpu")
+        self.device = torch.device(
+            "cuda" if torch.cuda.is_available() else "cpu"
+        )
 
         print("Loading AASIST model...")
 
