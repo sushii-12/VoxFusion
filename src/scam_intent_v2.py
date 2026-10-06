@@ -1,19 +1,14 @@
-import os
+from pathlib import Path
 
 from joblib import load
 
 
-MODEL_DIR = os.path.join("models", "scam_intent_v2")
+PROJECT_ROOT = Path(__file__).resolve().parents[1]
+MODEL_DIR = PROJECT_ROOT / "models" / "scam_intent_v2"
 
-VECTORIZER_PATH = os.path.join(
-    MODEL_DIR,
-    "tfidf_vectorizer.joblib"
-)
+VECTORIZER_PATH = MODEL_DIR / "tfidf_vectorizer.joblib"
 
-CLASSIFIER_PATH = os.path.join(
-    MODEL_DIR,
-    "logistic_regression.joblib"
-)
+CLASSIFIER_PATH = MODEL_DIR / "logistic_regression.joblib"
 
 
 class ScamIntentV2Analyzer:
