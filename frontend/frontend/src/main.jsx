@@ -3,7 +3,7 @@ import { createRoot } from 'react-dom/client';
 import './styles.css';
 import './premium.css';
 import Background from './Background.jsx';
-import { Logo, FusionDiagram, PipelineBusy, AnimatedNumber, Drawer, MODEL_INFO, UploadZone, SampleAudio, ErrorBoundary } from './Pipeline.jsx';
+import { Logo, FusionDiagram, BaselineDiagram, PipelineBusy, AnimatedNumber, Drawer, MODEL_INFO, UploadZone, SampleAudio, ErrorBoundary } from './Pipeline.jsx';
 
 const API = 'http://127.0.0.1:8001';
 
@@ -769,6 +769,7 @@ function AnalysisDetailView({ analysis, onClose }) {
   const transcript = whisper.transcript || evidenceData.transcript || '';
   const riskLevel = analysis.risk_level || evidenceData.risk_level || 'LOW';
   const riskScore = analysis.risk_score !== undefined ? analysis.risk_score : (evidenceData.risk_score ?? 0);
+  const baseline = analysis.mode === 'aasist_only';
 
   return (
     <div className="panel" style={{ marginTop: '24px', borderLeft: '4px solid var(--text)' }}>
@@ -785,7 +786,7 @@ function AnalysisDetailView({ analysis, onClose }) {
         <div style={{ display: 'flex', alignItems: 'center', gap: '20px' }}>
           <div className="resultScoreBlock">
             <b><AnimatedNumber value={riskScore} /></b>
-            <span>/ 100 Fusion Score</span>
+            <span>{baseline ? '/ 100 Baseline Score' : '/ 100 Fusion Score'}</span>
           </div>
           {onClose && <button className="ghost" onClick={onClose}>Close</button>}
         </div>
@@ -797,11 +798,20 @@ function AnalysisDetailView({ analysis, onClose }) {
         </div>
       ))}
       {/* Model Cards Grid */}
-      <h3>Sub-Model Assessments</h3>
+      {baseline ? (
+        <>
+          <h3>AASIST Baseline Assessment</h3>
+          <BaselineDiagram level={riskLevel} />
+        </>
+      ) : (
+        <>
+          <h3>Sub-Model Assessments</h3>
       <h3 style={{ marginTop: 8 }}>How the signals converge</h3>
       <FusionDiagram />
       <p className="note">AASIST contributes up to 35 points, scam intent up to 30, and ECAPA-TDNN acts as a contextual modifier. Weights are provisional.</p>
-      <div className="analysisCardsGrid">
+        </>
+      )}
+      <div className="analysisCardsGrid" style={baseline ? { gridTemplateColumns: 'minmax(0, 560px)' } : undefined}>
         {/* AASIST */}
         <div className="card">
           <h4>AASIST Deepfake Detector</h4>
@@ -819,7 +829,9 @@ function AnalysisDetailView({ analysis, onClose }) {
           </div>
         </div>
 
-        {/* ECAPA */}
+        {!baseline && (
+          <>
+          {/* ECAPA */}
         <div className="card">
           <h4>ECAPA-TDNN Speaker Verification</h4>
           <div className="cardMetric" style={{ textTransform: 'capitalize' }}>
@@ -873,16 +885,22 @@ function AnalysisDetailView({ analysis, onClose }) {
           </div>
           <div className="cardDesc">Score: {fx(v2.scam_intent_score, 1) ?? 0} / 100</div>
         </div>
+          </>
+        )}
       </div>
 
       {/* Transcript Block */}
+      {!baseline && (
+        <>
       <h3 style={{ marginTop: '24px' }}>Speech Transcript</h3>
       <div className="transcriptQuote">
         {transcript ? `“${transcript}”` : <em>No transcript available for this recording.</em>}
       </div>
+        </>
+      )}
 
       {/* Explanatory Reasons and Evidence */}
-      <h3 style={{ marginTop: '24px' }}>Fusion Reasoning & Evidence</h3>
+      <h3 style={{ marginTop: '24px' }}>{baseline ? 'Baseline Reasoning & Evidence' : 'Fusion Reasoning & Evidence'}</h3>
       {reasons.length > 0 && (
         <div>
           <h4 style={{ margin: '10px 0 5px', fontSize: '13px', color: 'var(--muted)' }}>Key Factors:</h4>
@@ -906,8 +924,10 @@ function AnalysisDetailView({ analysis, onClose }) {
       )}
 
       <div className="disclaimerBox">
-        <b>Evaluation Notice:</b> The final assessment is experimental evidence based on provisional multi-modal weights.
-        Raw scores and composite indices are not calibrated probabilities or legal identity determinations.
+        <b>Evaluation Notice:</b>{' '}
+        {baseline
+          ? 'This baseline uses a single acoustic countermeasure (AASIST). Raw scores are not calibrated probabilities or legal identity determinations.'
+          : 'The final assessment is experimental evidence based on provisional multi-modal weights. Raw scores and composite indices are not calibrated probabilities or legal identity determinations.'}
       </div>
     </div>
   );

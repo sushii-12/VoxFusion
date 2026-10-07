@@ -31,7 +31,7 @@ export function FusionDiagram() {
       <path d="M522 145H580" className="vfFlow" stroke="#7c6cff" strokeWidth="3" fill="none" />
       <circle cx="481" cy="145" r="42" fill="var(--surface)" stroke="#7c6cff" strokeWidth="2" />
       <circle cx="481" cy="145" r="54" fill="none" stroke="#7c6cff" opacity=".3" className="vfPulse" />
-      <text x="481" y="150" textAnchor="middle" fontWeight="600">FUSION</text><text className="mu" x="481" y="158" textAnchor="middle"></text>
+      <text x="481" y="142" textAnchor="middle" fontWeight="600">FUSION</text><text className="mu" x="481" y="158" textAnchor="middle">35 · 30 · ±12</text>
       <rect x="580" y="115" width="130" height="60" rx="12" fill="var(--surface2)" stroke="#7c6cff" />
       <text x="645" y="142" textAnchor="middle" fontWeight="600">THREAT</text><text className="mu" x="645" y="159" textAnchor="middle">assessment</text>
     </svg>
@@ -180,4 +180,21 @@ export class ErrorBoundary extends React.Component {
       </div>
     );
   }
+}
+
+/* AASIST-only (baseline) diagram: one signal -> threat assessment */
+export function BaselineDiagram({ level = 'LOW' }) {
+  const RM = typeof matchMedia !== 'undefined' && matchMedia('(prefers-reduced-motion: reduce)').matches;
+  const oc = level === 'HIGH' ? '#ff5d6c' : level === 'MEDIUM' ? '#f2b53d' : '#2fd18a';
+  const d = 'M250 70 H470';
+  return (
+    <svg className="vfSvg" viewBox="0 0 720 140" width="100%" role="img" aria-label="AASIST single-model detection leading to the threat assessment">
+      <rect x="90" y="40" width="160" height="60" rx="12" fill="var(--surface2)" stroke="#7c6cff" />
+      <text x="170" y="66" textAnchor="middle" fontWeight="600">AASIST</text><text className="mu" x="170" y="84" textAnchor="middle">deepfake</text>
+      <path d={d} className="vfFlow" fill="none" stroke="#7c6cff" strokeWidth="3" />
+      {!RM && <circle r="3.6" fill="#35d0e6"><animateMotion dur="2s" repeatCount="indefinite" path={d} /></circle>}
+      <rect x="470" y="40" width="160" height="60" rx="12" fill="var(--surface2)" stroke={oc} />
+      <text x="550" y="66" textAnchor="middle" fontWeight="600">THREAT</text><text className="mu" x="550" y="84" textAnchor="middle">assessment</text>
+    </svg>
+  );
 }
