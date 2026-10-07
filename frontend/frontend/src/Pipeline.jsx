@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 
 // Logo mark (waveform + fusion)
 export function Logo({ size = 28 }) {
@@ -90,4 +90,94 @@ export function Drawer({ open, title, onClose, children }) {
       </aside>
     </>
   );
+}
+
+/* ---------- Upload zone (wraps the existing file state; no API change) ---------- */
+const AUDIO_EXT = /\.(wav|mp3|m4a|flac|ogg|webm)$/i;
+export function UploadZone({ file, onFile }) {
+  const [over, setOver] = useState(false);
+  const [err, setErr] = useState('');
+  const inp = useRef(null);
+  const take = (f) => {
+    if (!f) return;
+    if (!(f.type.startsWith('audio/') || AUDIO_EXT.test(f.name))) { setErr(`${f.name} isn’t a supported audio file. Use WAV, MP3, M4A, FLAC, OGG or WEBM.`); return; }
+    setErr(''); onFile(f);
+  };
+  const key = (e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); inp.current.click(); } };
+  return (
+    <div style={{ flex: '1 1 100%' }}>
+      <div className={'vfDrop' + (over ? ' over' : '') + (file ? ' has' : '')} role="button" tabIndex={0} aria-label="Choose or drop an audio file"
+        onClick={() => inp.current.click()} onKeyDown={key}
+        onDragOver={(e) => { e.preventDefault(); setOver(true); }} onDragLeave={() => setOver(false)}
+        onDrop={(e) => { e.preventDefault(); setOver(false); take(e.dataTransfer.files?.[0]); }}>
+        <input ref={inp} type="file" accept="audio/*" hidden onChange={(e) => { take(e.target.files?.[0]); e.target.value = ''; }} />
+        {file ? (
+          <>
+            <span className="vfTick" aria-hidden="true">✓</span>
+            <div style={{ flex: 1, minWidth: 0 }}><b style={{ wordBreak: 'break-all' }}>{file.name}</b><div className="note">{(file.size / 1024).toFixed(0)} KB · ready to store</div></div>
+            <button type="button" className="ghost" onClick={(e) => { e.stopPropagation(); onFile(null); setErr(''); }}>Remove</button>
+          </>
+        ) : (
+          <div><b>Drop an audio file here</b><div className="note">or click to browse · WAV, MP3, M4A, FLAC, OGG, WEBM</div></div>
+        )}
+      </div>
+      {err && <p role="alert" style={{ color: 'var(--danger)', margin: '8px 0 0', fontSize: 13 }}>{err}</p>}
+    </div>
+  );
+}
+
+/* ---------- Waveform computed from the REAL audio file served by the backend ---------- */
+const peakCache = new Map();
+async function computePeaks(src, n = 90) {
+  if (peakCache.has(src)) return peakCache.get(src);
+  const res = await fetch(src);
+  if (!res.ok) throw new Error('audio fetch failed');
+  const buf = await res.arrayBuffer();
+  const Ctx = window.AudioContext || window.webkitAudioContext;
+  const ctx = new Ctx();
+  try {
+    const audio = await new Promise((ok, no) => ctx.decodeAudioData(buf, ok, no));
+    const ch = audio.getChannelData(0), step = Math.max(1, Math.floor(ch.length / n)), skip = Math.max(1, Math.floor(step / 200)), peaks = [];
+    for (let i = 0; i < n; i++) { let m = 0; for (let j = i * step; j < (i + 1) * step && j < ch.length; j += skip) m = Math.max(m, Math.abs(ch[j])); peaks.push(m); }
+    const mx = Math.max(...peaks) || 1, out = peaks.map((x) => x / mx);
+    peakCache.set(src, out);
+    return out;
+  } finally { if (ctx.close) ctx.close(); }
+}
+
+export function SampleAudio({ src }) {
+  const [peaks, setPeaks] = useState(null);
+  const [err, setErr] = useState(false);
+  const [prog, setProg] = useState(0);
+  const a = useRef(null);
+  useEffect(() => { let live = true; setPeaks(null); setErr(false); computePeaks(src).then((p) => live && setPeaks(p)).catch(() => live && setErr(true)); return () => { live = false; }; }, [src]);
+  const seek = (e) => { const el = a.current; if (!el || !el.duration) return; const r = e.currentTarget.getBoundingClientRect(); el.currentTime = ((e.clientX - r.left) / r.width) * el.duration; };
+  return (
+    <div className="vfSample">
+      {!err && (
+        <div className="vfWave" onClick={seek} role="img" aria-label="Audio waveform. Click to seek.">
+          {peaks ? peaks.map((v, i) => <i key={i} className={i / peaks.length < prog ? 'on' : ''} style={{ height: `${Math.max(8, v * 100)}%` }} />) : <span className="vfSkel" />}
+        </div>
+      )}
+      <audio ref={a} controls preload="metadata" src={src} onTimeUpdate={(e) => setProg(e.target.duration ? e.target.currentTime / e.target.duration : 0)} onEnded={() => setProg(0)} />
+    </div>
+  );
+}
+
+/* ---------- Error boundary: shows the real error instead of a blank white page ---------- */
+export class ErrorBoundary extends React.Component {
+  constructor(props) { super(props); this.state = { err: null }; }
+  static getDerivedStateFromError(err) { return { err }; }
+  componentDidCatch(err, info) { console.error('VoxFusion UI error:', err, info?.componentStack); }
+  render() {
+    if (!this.state.err) return this.props.children;
+    return (
+      <div className="panel" role="alert" style={{ margin: 24, borderLeft: '4px solid var(--danger)' }}>
+        <h3>This view hit an error</h3>
+        <p className="note">The backend and your data are not affected. Error message:</p>
+        <pre style={{ whiteSpace: 'pre-wrap', fontFamily: 'var(--mono)', fontSize: 12, color: 'var(--danger)' }}>{(String(this.state.err?.message || this.state.err) + '\n' + String(this.state.err?.stack || '')).slice(0, 900)}</pre>
+        <button className="ghost" onClick={() => this.props.inline ? this.setState({ err: null }) : location.reload()}>{this.props.inline ? 'Dismiss' : 'Reload'}</button>
+      </div>
+    );
+  }
 }

@@ -1,9 +1,9 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { createRoot } from 'react-dom/client';
 import './styles.css';
 import './premium.css';
 import Background from './Background.jsx';
-import { Logo, FusionDiagram, PipelineBusy, AnimatedNumber, Drawer, MODEL_INFO } from './Pipeline.jsx';
+import { Logo, FusionDiagram, PipelineBusy, AnimatedNumber, Drawer, MODEL_INFO, UploadZone, SampleAudio, ErrorBoundary } from './Pipeline.jsx';
 
 const API = 'http://127.0.0.1:8001';
 
@@ -49,6 +49,18 @@ function App() {
 
   const [busy, setBusy] = useState(false);
   const [infoModel, setInfoModel] = useState(null);
+  const [histItem, setHistItem] = useState(null);
+  const navRef = useRef(null);
+  const [ind, setInd] = useState({ top: 0, h: 0, ready: false });
+  useLayoutEffect(() => {
+    const place = () => {
+      const el = navRef.current?.querySelector('.nav.active');
+      if (el) setInd((p) => ({ top: el.offsetTop, h: el.offsetHeight, ready: p.ready || p.h > 0 }));
+    };
+    place();
+    addEventListener('resize', place);
+    return () => removeEventListener('resize', place);
+  }, [page]);
 
   useEffect(() => {
     document.documentElement.dataset.theme = theme;
@@ -335,7 +347,8 @@ function App() {
           <Logo /><b>VOXFUSION</b>
           <span> / AI SUITE</span>
         </div>
-        <nav>
+        <nav ref={navRef} className="navWrap">
+          <i className={ind.ready ? 'navInd ready' : 'navInd'} style={{ transform: `translateY(${ind.top}px)`, height: ind.h }} />
           {['Overview', 'Family', 'Voice Samples', 'Analyses', 'Comparisons', 'Settings'].map((x) => (
             <button key={x} onClick={() => setPage(x)} className={page === x ? 'nav active' : 'nav'}>
               {x}
@@ -462,7 +475,7 @@ function App() {
                   </option>
                 ))}
               </select>
-              <input type="file" accept="audio/*" onChange={(e) => setFile(e.target.files?.[0] || null)} />
+              <UploadZone file={file} onFile={setFile} />
               <button>Store voice sample</button>
             </form>
             <p className="note">Supported: WAV, MP3, M4A, FLAC, OGG, WEBM. Original recordings stored locally for ECAPA reference.</p>
@@ -473,7 +486,7 @@ function App() {
                     <div>
                       <b>{s.filename}</b>
                       <span>{new Date(s.created_at).toLocaleString()}</span>
-                      <audio controls preload="metadata" src={`${API}/api/voice-samples/${s.id}/audio`} />
+                      <SampleAudio src={`${API}/api/voice-samples/${s.id}/audio`} />
                     </div>
                     <button className="ghost danger" onClick={() => deleteSample(s)}>Delete</button>
                   </div>
@@ -533,7 +546,9 @@ function App() {
 
             {/* Active Analysis Detailed Results */}
             {activeAnalysis && (
-              <AnalysisDetailView analysis={activeAnalysis} onClose={() => setActiveAnalysis(null)} />
+              <ErrorBoundary inline key={activeAnalysis.id ?? 'current'}>
+                <AnalysisDetailView analysis={activeAnalysis} onClose={() => setActiveAnalysis(null)} />
+              </ErrorBoundary>
             )}
 
             {/* Analysis History List */}
@@ -541,14 +556,15 @@ function App() {
             <div className="list">
               {analyses.length ? (
                 analyses.map((a) => (
-                  <div className="row" key={a.id}>
+                  <div className="row click" key={a.id} role="button" tabIndex={0} onClick={() => setHistItem(a)} onKeyDown={(e) => e.key === 'Enter' && setHistItem(a)}>
                     <div>
                       <b>Analysis #{a.id}</b>
+                      {riskOf(a) && <span className={`riskBadge ${getRiskClass(riskOf(a))}`} style={{ marginLeft: 10 }}>{riskOf(a)}</span>}
                       <span>{a.verdict} · Mode: {a.mode} · {new Date(a.created_at).toLocaleString()}</span>
                     </div>
                     <div className="actions">
-                      <button className="ghost" onClick={() => viewAnalysis(a.id)}>View Details</button>
-                      <button className="ghost danger" onClick={() => deleteAnalysis(a.id)}>Delete</button>
+                      <button className="ghost" onClick={(e) => { e.stopPropagation(); viewAnalysis(a.id); }}>View Details</button>
+                      <button className="ghost danger" onClick={(e) => { e.stopPropagation(); deleteAnalysis(a.id); }}>Delete</button>
                     </div>
                   </div>
                 ))
@@ -700,6 +716,23 @@ function App() {
       <Drawer open={!!infoModel} title={infoModel || ''} onClose={() => setInfoModel(null)}>
           <p className="note">{MODEL_INFO[infoModel]}</p>
         </Drawer>
+        <Drawer open={!!histItem} title={histItem ? `Analysis #${histItem.id}` : ''} onClose={() => setHistItem(null)}>
+          {histItem && (
+            <>
+              {riskOf(histItem) && <span className={`riskBadge ${getRiskClass(riskOf(histItem))}`}>{riskOf(histItem)} RISK</span>}
+              <p style={{ fontWeight: 600, marginTop: 14 }}>{histItem.verdict}</p>
+              <div className="kv">
+                <span>Mode</span><b>{histItem.mode}</b>
+                <span>Created</span><b>{new Date(histItem.created_at).toLocaleString()}</b>
+                {[['Confidence', histItem.confidence], ['AASIST score', histItem.aasist_score], ['ECAPA score', histItem.ecapa_score], ['Whisper score', histItem.whisper_score]]
+                  .filter(([, v]) => v !== null && v !== undefined)
+                  .map(([k, v]) => (<React.Fragment key={k}><span>{k}</span><b>{String(v)}</b></React.Fragment>))}
+              </div>
+              <button className="wideButton" onClick={() => { const id = histItem.id; setHistItem(null); viewAnalysis(id).then(() => window.scrollTo({ top: 0, behavior: 'smooth' })); }}>Open full report</button>
+              <button className="wideButton dangerButton" onClick={() => { const id = histItem.id; setHistItem(null); deleteAnalysis(id); }}>Delete analysis</button>
+            </>
+          )}
+        </Drawer>
       </main>
     </div>
   );
@@ -755,13 +788,13 @@ function AnalysisDetailView({ analysis, onClose }) {
             {aasist.prediction || evidenceData.prediction || (aasist.spoof_score >= 0.5 ? 'deepfake' : 'bona_fide')}
           </div>
           <div className="cardDesc">
-            Deepfake Raw Score: {aasist.spoof_score !== undefined ? aasist.spoof_score.toFixed(4) : (analysis.aasist_score ? (1 - analysis.aasist_score).toFixed(4) : 'N/A')}
+            Deepfake Raw Score: {fx(aasist.spoof_score, 4) ?? (typeof analysis.aasist_score === 'number' ? fx(1 - analysis.aasist_score, 4) : 'N/A')}
           </div>
           <div className="cardDesc">
-            Bona-fide Raw Score: {aasist.authentic_score !== undefined ? aasist.authentic_score.toFixed(4) : (analysis.aasist_score?.toFixed(4) || 'N/A')}
+            Bona-fide Raw Score: {fx(aasist.authentic_score, 4) ?? fx(analysis.aasist_score, 4) ?? 'N/A'}
           </div>
           <div className="cardDesc">
-            Raw CM Score: {aasist.raw_bona_fide_score !== undefined ? aasist.raw_bona_fide_score.toFixed(4) : (evidenceData.raw_bona_fide_score ?? 'N/A')}
+            Raw CM Score: {fx(aasist.raw_bona_fide_score, 4) ?? fx(evidenceData.raw_bona_fide_score, 4) ?? 'N/A'}
           </div>
         </div>
 
@@ -775,7 +808,7 @@ function AnalysisDetailView({ analysis, onClose }) {
             Speaker Match: {ecapa.same_speaker ? 'Same Speaker' : (ecapa.status === 'not_verified' ? 'No Reference Provided' : 'Different Speaker')}
           </div>
           <div className="cardDesc">
-            Voice Match Score: {ecapa.similarity_score !== null && ecapa.similarity_score !== undefined ? ecapa.similarity_score.toFixed(4) : (analysis.ecapa_score?.toFixed(4) ?? 'N/A')}
+            Voice Match Score: {fx(ecapa.similarity_score, 4) ?? fx(analysis.ecapa_score, 4) ?? 'N/A'}
           </div>
           <div className="cardDesc">{ecapa.detail || 'Reference speaker comparison'}</div>
         </div>
@@ -787,7 +820,7 @@ function AnalysisDetailView({ analysis, onClose }) {
             {whisper.language ? whisper.language.toUpperCase() : 'EN'} Speech
           </div>
           <div className="cardDesc">
-            Language Prob: {whisper.language_probability !== undefined ? whisper.language_probability?.toFixed(4) : (analysis.whisper_score?.toFixed(4) || '1.0000')}
+            Language Prob: {fx(whisper.language_probability, 4) ?? fx(analysis.whisper_score, 4) ?? '1.0000'}
           </div>
           <div className="cardDesc">
             Status: {transcript ? 'Speech Detected' : 'No speech or silent'}
@@ -815,9 +848,9 @@ function AnalysisDetailView({ analysis, onClose }) {
           <h4>Scam Intent V2 (ML Model)</h4>
           <div className="cardMetric">Risk: {v2.risk_level || 'LOW'}</div>
           <div className="cardDesc">
-            ML Scam Probability: {v2.scam_probability !== undefined ? v2.scam_probability.toFixed(4) : 'N/A'}
+            ML Scam Probability: {fx(v2.scam_probability, 4) ?? 'N/A'}
           </div>
-          <div className="cardDesc">Score: {v2.scam_intent_score !== undefined ? v2.scam_intent_score.toFixed(1) : 0} / 100</div>
+          <div className="cardDesc">Score: {fx(v2.scam_intent_score, 1) ?? 0} / 100</div>
         </div>
       </div>
 
@@ -945,6 +978,9 @@ function Settings({ theme, setTheme, onExport, onImport, onClear, busy }) {
   );
 }
 
+const fx = (v, d) => (typeof v === 'number' && Number.isFinite(v) ? v.toFixed(d) : null);
+const riskOf = (a) => a.risk_level || a.evidence?.risk_level || null;
+
 function Stat({ label, value, onClick }) {
   const act = onClick ? { role: 'button', tabIndex: 0, onClick, onKeyDown: (e) => (e.key === 'Enter' || e.key === ' ') && onClick() } : {};
   return (
@@ -955,4 +991,8 @@ function Stat({ label, value, onClick }) {
   );
 }
 
-createRoot(document.getElementById('root')).render(<App />);
+createRoot(document.getElementById('root')).render(
+  <ErrorBoundary>
+    <App />
+  </ErrorBoundary>
+);
