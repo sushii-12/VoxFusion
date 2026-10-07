@@ -3,7 +3,7 @@ import { createRoot } from 'react-dom/client';
 import './styles.css';
 import './premium.css';
 import Background from './Background.jsx';
-import { Logo, FusionDiagram, BaselineDiagram, PipelineBusy, AnimatedNumber, Drawer, MODEL_INFO, UploadZone, SampleAudio, ErrorBoundary } from './Pipeline.jsx';
+import { Logo, FusionDiagram, BaselineDiagram, PipelineBusy, AnimatedNumber, Drawer, Modal, ModelDetail, MODEL_INFO, UploadZone, SampleAudio, ErrorBoundary } from './Pipeline.jsx';
 
 const API = 'http://127.0.0.1:8001';
 
@@ -226,6 +226,7 @@ function App() {
       fd.append('mode', analysisMode);
       const res = await api(`/api/analyze/${selectedSampleId}`, { method: 'POST', body: fd });
       setActiveAnalysis(res);
+      scrollToResult();
       notify('Analysis complete.');
       await load();
     } catch (e) {
@@ -240,6 +241,7 @@ function App() {
     try {
       const data = await api(`/api/analyses/${analysisId}`);
       setActiveAnalysis(data);
+      scrollToResult();
     } catch (e) {
       notify(e.message);
     } finally {
@@ -729,9 +731,9 @@ function App() {
         )}
 
         {message && <div className="toast">{message}</div>}
-      <Drawer open={!!infoModel} title={infoModel || ''} onClose={() => setInfoModel(null)}>
-          <p className="note">{MODEL_INFO[infoModel]}</p>
-        </Drawer>
+      <Modal open={!!infoModel} title={infoModel || ''} onClose={() => setInfoModel(null)}>
+          {infoModel && <ModelDetail name={infoModel} health={health} />}
+        </Modal>
         <Drawer open={!!histItem} title={histItem ? `Analysis #${histItem.id}` : ''} onClose={() => setHistItem(null)}>
           {histItem && (
             <>
@@ -744,7 +746,7 @@ function App() {
                   .filter(([, v]) => v !== null && v !== undefined)
                   .map(([k, v]) => (<React.Fragment key={k}><span>{k}</span><b>{String(v)}</b></React.Fragment>))}
               </div>
-              <button className="wideButton" onClick={() => { const id = histItem.id; setHistItem(null); viewAnalysis(id).then(() => window.scrollTo({ top: 0, behavior: 'smooth' })); }}>Open full report</button>
+              <button className="wideButton" onClick={() => { const id = histItem.id; setHistItem(null); viewAnalysis(id); }}>Open full report</button>
               <button className="wideButton dangerButton" onClick={() => { const id = histItem.id; setHistItem(null); deleteAnalysis(id); }}>Delete analysis</button>
             </>
           )}
@@ -772,7 +774,7 @@ function AnalysisDetailView({ analysis, onClose }) {
   const baseline = analysis.mode === 'aasist_only';
 
   return (
-    <div className="panel" style={{ marginTop: '24px', borderLeft: '4px solid var(--text)' }}>
+    <div id="analysisResult" className="panel" style={{ marginTop: '24px', borderLeft: '4px solid var(--text)' }}>
       <div className="resultHeader">
         <div>
           <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
@@ -1019,6 +1021,7 @@ function Settings({ theme, setTheme, onExport, onImport, onClear, busy }) {
   );
 }
 
+const scrollToResult = () => setTimeout(() => document.getElementById('analysisResult')?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 80);
 const fx = (v, d) => (typeof v === 'number' && Number.isFinite(v) ? v.toFixed(d) : null);
 const riskOf = (a) => a.risk_level || a.evidence?.risk_level || null;
 
