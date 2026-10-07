@@ -1,6 +1,9 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { createRoot } from 'react-dom/client';
 import './styles.css';
+import './premium.css';
+import Background from './Background.jsx';
+import { Logo, FusionDiagram, PipelineBusy, AnimatedNumber, Drawer, MODEL_INFO, UploadZone, SampleAudio, ErrorBoundary } from './Pipeline.jsx';
 
 const API = 'http://127.0.0.1:8001';
 
@@ -45,6 +48,19 @@ function App() {
   const [comparisonResult, setComparisonResult] = useState(null);
 
   const [busy, setBusy] = useState(false);
+  const [infoModel, setInfoModel] = useState(null);
+  const [histItem, setHistItem] = useState(null);
+  const navRef = useRef(null);
+  const [ind, setInd] = useState({ top: 0, h: 0, ready: false });
+  useLayoutEffect(() => {
+    const place = () => {
+      const el = navRef.current?.querySelector('.nav.active');
+      if (el) setInd((p) => ({ top: el.offsetTop, h: el.offsetHeight, ready: p.ready || p.h > 0 }));
+    };
+    place();
+    addEventListener('resize', place);
+    return () => removeEventListener('resize', place);
+  }, [page]);
 
   useEffect(() => {
     document.documentElement.dataset.theme = theme;
@@ -325,12 +341,13 @@ function App() {
 
   return (
     <div className="app">
+      <Background />
       <aside className="sidebar">
         <div className="brand">
-          <b>VOXFUSION</b>
-          <span> / AI SUITE</span>
+          <Logo /><b>VOXFUSION</b>
         </div>
-        <nav>
+        <nav ref={navRef} className="navWrap">
+          <i className={ind.ready ? 'navInd ready' : 'navInd'} style={{ transform: `translateY(${ind.top}px)`, height: ind.h }} />
           {['Overview', 'Family', 'Voice Samples', 'Analyses', 'Comparisons', 'Settings'].map((x) => (
             <button key={x} onClick={() => setPage(x)} className={page === x ? 'nav active' : 'nav'}>
               {x}
@@ -358,10 +375,11 @@ function App() {
               certainty.
             </h1>
             <p className="sub">Multi-modal voice deepfake detection, biometric verification & scam-intent analysis.</p>
+            <div className="panel" style={{ marginTop: 0, marginBottom: 26 }}><FusionDiagram /></div>
             <div className="stats">
-              <Stat label="Family Members" value={members.length} />
-              <Stat label="Voice Samples" value={totalSamples} />
-              <Stat label="Completed Analyses" value={analyses.length} />
+              <Stat label="Family Members" value={members.length} onClick={() => setPage('Family')} />
+              <Stat label="Voice Samples" value={totalSamples} onClick={() => setPage('Voice Samples')} />
+              <Stat label="Completed Analyses" value={analyses.length} onClick={() => setPage('Analyses')} />
               <Stat label="AI Pipeline Status" value={modelReady ? 'Online' : 'Ready'} />
             </div>
             <div className="panel">
@@ -370,27 +388,27 @@ function App() {
                 <span className="demo">VOXFUSION PIPELINE</span>
               </div>
               <div className="modelgrid">
-                <div className="model">
+                <div className="model click" role="button" tabIndex={0} onClick={() => setInfoModel('AASIST')} onKeyDown={(e) => (e.key === 'Enter' || e.key === ' ') && setInfoModel('AASIST')}>
                   <b>AASIST</b>
                   <span>Acoustic deepfake countermeasure ({health?.models?.aasist ? 'Active' : 'Offline'})</span>
                 </div>
-                <div className="model">
+                <div className="model click" role="button" tabIndex={0} onClick={() => setInfoModel('ECAPA-TDNN')} onKeyDown={(e) => (e.key === 'Enter' || e.key === ' ') && setInfoModel('ECAPA-TDNN')}>
                   <b>ECAPA-TDNN</b>
                   <span>Biometric speaker identity ({health?.models?.ecapa ? 'Active' : 'Offline'})</span>
                 </div>
-                <div className="model">
+                <div className="model click" role="button" tabIndex={0} onClick={() => setInfoModel('Whisper (small)')} onKeyDown={(e) => (e.key === 'Enter' || e.key === ' ') && setInfoModel('Whisper (small)')}>
                   <b>Whisper (small)</b>
                   <span>Automatic speech recognition ({health?.models?.whisper ? 'Active' : 'Offline'})</span>
                 </div>
-                <div className="model">
+                <div className="model click" role="button" tabIndex={0} onClick={() => setInfoModel('Scam Intent V1')} onKeyDown={(e) => (e.key === 'Enter' || e.key === ' ') && setInfoModel('Scam Intent V1')}>
                   <b>Scam Intent V1</b>
                   <span>Rule-based urgency & extortion detection ({health?.models?.scam_intent_v1 ? 'Active' : 'Offline'})</span>
                 </div>
-                <div className="model">
+                <div className="model click" role="button" tabIndex={0} onClick={() => setInfoModel('Scam Intent V2')} onKeyDown={(e) => (e.key === 'Enter' || e.key === ' ') && setInfoModel('Scam Intent V2')}>
                   <b>Scam Intent V2</b>
                   <span>TF-IDF + Logistic Regression ML classifier ({health?.models?.scam_intent_v2 ? 'Active' : 'Offline'})</span>
                 </div>
-                <div className="model">
+                <div className="model click" role="button" tabIndex={0} onClick={() => setInfoModel('Fusion Engine')} onKeyDown={(e) => (e.key === 'Enter' || e.key === ' ') && setInfoModel('Fusion Engine')}>
                   <b>Fusion Engine</b>
                   <span>Provisional multi-factor synthesis ({health?.models?.fusion ? 'Active' : 'Offline'})</span>
                 </div>
@@ -456,7 +474,7 @@ function App() {
                   </option>
                 ))}
               </select>
-              <input type="file" accept="audio/*" onChange={(e) => setFile(e.target.files?.[0] || null)} />
+              <UploadZone file={file} onFile={setFile} />
               <button>Store voice sample</button>
             </form>
             <p className="note">Supported: WAV, MP3, M4A, FLAC, OGG, WEBM. Original recordings stored locally for ECAPA reference.</p>
@@ -467,7 +485,7 @@ function App() {
                     <div>
                       <b>{s.filename}</b>
                       <span>{new Date(s.created_at).toLocaleString()}</span>
-                      <audio controls preload="metadata" src={`${API}/api/voice-samples/${s.id}/audio`} />
+                      <SampleAudio src={`${API}/api/voice-samples/${s.id}/audio`} />
                     </div>
                     <button className="ghost danger" onClick={() => deleteSample(s)}>Delete</button>
                   </div>
@@ -517,6 +535,7 @@ function App() {
                   {busy ? 'Analyzing audio...' : 'Run Analysis'}
                 </button>
               </form>
+              {busy && <PipelineBusy />}
               {!allSamples.length && (
                 <p className="note" style={{ marginTop: '12px' }}>
                   No audio samples found. Please upload recordings on the <b>Voice Samples</b> page first.
@@ -526,7 +545,9 @@ function App() {
 
             {/* Active Analysis Detailed Results */}
             {activeAnalysis && (
-              <AnalysisDetailView analysis={activeAnalysis} onClose={() => setActiveAnalysis(null)} />
+              <ErrorBoundary inline key={activeAnalysis.id ?? 'current'}>
+                <AnalysisDetailView analysis={activeAnalysis} onClose={() => setActiveAnalysis(null)} />
+              </ErrorBoundary>
             )}
 
             {/* Analysis History List */}
@@ -534,14 +555,15 @@ function App() {
             <div className="list">
               {analyses.length ? (
                 analyses.map((a) => (
-                  <div className="row" key={a.id}>
+                  <div className="row click" key={a.id} role="button" tabIndex={0} onClick={() => setHistItem(a)} onKeyDown={(e) => e.key === 'Enter' && setHistItem(a)}>
                     <div>
                       <b>Analysis #{a.id}</b>
+                      {riskOf(a) && <span className={`riskBadge ${getRiskClass(riskOf(a))}`} style={{ marginLeft: 10 }}>{riskOf(a)}</span>}
                       <span>{a.verdict} · Mode: {a.mode} · {new Date(a.created_at).toLocaleString()}</span>
                     </div>
                     <div className="actions">
-                      <button className="ghost" onClick={() => viewAnalysis(a.id)}>View Details</button>
-                      <button className="ghost danger" onClick={() => deleteAnalysis(a.id)}>Delete</button>
+                      <button className="ghost" onClick={(e) => { e.stopPropagation(); viewAnalysis(a.id); }}>View Details</button>
+                      <button className="ghost danger" onClick={(e) => { e.stopPropagation(); deleteAnalysis(a.id); }}>Delete</button>
                     </div>
                   </div>
                 ))
@@ -596,6 +618,7 @@ function App() {
                   {busy ? 'Running comparison...' : 'Compare Paradigms'}
                 </button>
               </form>
+              {busy && <PipelineBusy label="Running AASIST baseline and full VoxFusion…" />}
             </div>
 
             {/* Comparison Side-by-Side View */}
@@ -611,7 +634,7 @@ function App() {
                       </span>
                     </div>
                     <div className="resultScoreBlock">
-                      <b>{comparisonResult.baseline_aasist?.risk_score}</b>
+                      <b><AnimatedNumber value={comparisonResult.baseline_aasist?.risk_score} /></b>
                       <span>/ 100 Risk Score</span>
                     </div>
                     <p style={{ marginTop: '12px', fontWeight: 600 }}>{comparisonResult.baseline_aasist?.verdict}</p>
@@ -640,7 +663,7 @@ function App() {
                       </span>
                     </div>
                     <div className="resultScoreBlock">
-                      <b>{comparisonResult.voxfusion_combined?.risk_score}</b>
+                      <b><AnimatedNumber value={comparisonResult.voxfusion_combined?.risk_score} /></b>
                       <span>/ 100 Risk Score</span>
                     </div>
                     <p style={{ marginTop: '12px', fontWeight: 600 }}>{comparisonResult.voxfusion_combined?.verdict}</p>
@@ -689,6 +712,26 @@ function App() {
         )}
 
         {message && <div className="toast">{message}</div>}
+      <Drawer open={!!infoModel} title={infoModel || ''} onClose={() => setInfoModel(null)}>
+          <p className="note">{MODEL_INFO[infoModel]}</p>
+        </Drawer>
+        <Drawer open={!!histItem} title={histItem ? `Analysis #${histItem.id}` : ''} onClose={() => setHistItem(null)}>
+          {histItem && (
+            <>
+              {riskOf(histItem) && <span className={`riskBadge ${getRiskClass(riskOf(histItem))}`}>{riskOf(histItem)} RISK</span>}
+              <p style={{ fontWeight: 600, marginTop: 14 }}>{histItem.verdict}</p>
+              <div className="kv">
+                <span>Mode</span><b>{histItem.mode}</b>
+                <span>Created</span><b>{new Date(histItem.created_at).toLocaleString()}</b>
+                {[['Confidence', histItem.confidence], ['AASIST score', histItem.aasist_score], ['ECAPA score', histItem.ecapa_score], ['Whisper score', histItem.whisper_score]]
+                  .filter(([, v]) => v !== null && v !== undefined)
+                  .map(([k, v]) => (<React.Fragment key={k}><span>{k}</span><b>{String(v)}</b></React.Fragment>))}
+              </div>
+              <button className="wideButton" onClick={() => { const id = histItem.id; setHistItem(null); viewAnalysis(id).then(() => window.scrollTo({ top: 0, behavior: 'smooth' })); }}>Open full report</button>
+              <button className="wideButton dangerButton" onClick={() => { const id = histItem.id; setHistItem(null); deleteAnalysis(id); }}>Delete analysis</button>
+            </>
+          )}
+        </Drawer>
       </main>
     </div>
   );
@@ -724,7 +767,7 @@ function AnalysisDetailView({ analysis, onClose }) {
         </div>
         <div style={{ display: 'flex', alignItems: 'center', gap: '20px' }}>
           <div className="resultScoreBlock">
-            <b>{typeof riskScore === 'number' ? riskScore.toFixed(1) : riskScore}</b>
+            <b><AnimatedNumber value={riskScore} /></b>
             <span>/ 100 Fusion Score</span>
           </div>
           {onClose && <button className="ghost" onClick={onClose}>Close</button>}
@@ -733,6 +776,9 @@ function AnalysisDetailView({ analysis, onClose }) {
 
       {/* Model Cards Grid */}
       <h3>Sub-Model Assessments</h3>
+      <h3 style={{ marginTop: 8 }}>How the signals converge</h3>
+      <FusionDiagram />
+      <p className="note">AASIST contributes up to 35 points, scam intent up to 30, and ECAPA-TDNN acts as a contextual modifier. Weights are provisional.</p>
       <div className="analysisCardsGrid">
         {/* AASIST */}
         <div className="card">
@@ -741,13 +787,13 @@ function AnalysisDetailView({ analysis, onClose }) {
             {aasist.prediction || evidenceData.prediction || (aasist.spoof_score >= 0.5 ? 'deepfake' : 'bona_fide')}
           </div>
           <div className="cardDesc">
-            Deepfake Raw Score: {aasist.spoof_score !== undefined ? aasist.spoof_score.toFixed(4) : (analysis.aasist_score ? (1 - analysis.aasist_score).toFixed(4) : 'N/A')}
+            Deepfake Raw Score: {fx(aasist.spoof_score, 4) ?? (typeof analysis.aasist_score === 'number' ? fx(1 - analysis.aasist_score, 4) : 'N/A')}
           </div>
           <div className="cardDesc">
-            Bona-fide Raw Score: {aasist.authentic_score !== undefined ? aasist.authentic_score.toFixed(4) : (analysis.aasist_score?.toFixed(4) || 'N/A')}
+            Bona-fide Raw Score: {fx(aasist.authentic_score, 4) ?? fx(analysis.aasist_score, 4) ?? 'N/A'}
           </div>
           <div className="cardDesc">
-            Raw CM Score: {aasist.raw_bona_fide_score !== undefined ? aasist.raw_bona_fide_score.toFixed(4) : (evidenceData.raw_bona_fide_score ?? 'N/A')}
+            Raw CM Score: {fx(aasist.raw_bona_fide_score, 4) ?? fx(evidenceData.raw_bona_fide_score, 4) ?? 'N/A'}
           </div>
         </div>
 
@@ -761,7 +807,7 @@ function AnalysisDetailView({ analysis, onClose }) {
             Speaker Match: {ecapa.same_speaker ? 'Same Speaker' : (ecapa.status === 'not_verified' ? 'No Reference Provided' : 'Different Speaker')}
           </div>
           <div className="cardDesc">
-            Voice Match Score: {ecapa.similarity_score !== null && ecapa.similarity_score !== undefined ? ecapa.similarity_score.toFixed(4) : (analysis.ecapa_score?.toFixed(4) ?? 'N/A')}
+            Voice Match Score: {fx(ecapa.similarity_score, 4) ?? fx(analysis.ecapa_score, 4) ?? 'N/A'}
           </div>
           <div className="cardDesc">{ecapa.detail || 'Reference speaker comparison'}</div>
         </div>
@@ -773,7 +819,7 @@ function AnalysisDetailView({ analysis, onClose }) {
             {whisper.language ? whisper.language.toUpperCase() : 'EN'} Speech
           </div>
           <div className="cardDesc">
-            Language Prob: {whisper.language_probability !== undefined ? whisper.language_probability?.toFixed(4) : (analysis.whisper_score?.toFixed(4) || '1.0000')}
+            Language Prob: {fx(whisper.language_probability, 4) ?? fx(analysis.whisper_score, 4) ?? '1.0000'}
           </div>
           <div className="cardDesc">
             Status: {transcript ? 'Speech Detected' : 'No speech or silent'}
@@ -801,9 +847,9 @@ function AnalysisDetailView({ analysis, onClose }) {
           <h4>Scam Intent V2 (ML Model)</h4>
           <div className="cardMetric">Risk: {v2.risk_level || 'LOW'}</div>
           <div className="cardDesc">
-            ML Scam Probability: {v2.scam_probability !== undefined ? v2.scam_probability.toFixed(4) : 'N/A'}
+            ML Scam Probability: {fx(v2.scam_probability, 4) ?? 'N/A'}
           </div>
-          <div className="cardDesc">Score: {v2.scam_intent_score !== undefined ? v2.scam_intent_score.toFixed(1) : 0} / 100</div>
+          <div className="cardDesc">Score: {fx(v2.scam_intent_score, 1) ?? 0} / 100</div>
         </div>
       </div>
 
@@ -931,13 +977,21 @@ function Settings({ theme, setTheme, onExport, onImport, onClear, busy }) {
   );
 }
 
-function Stat({ label, value }) {
+const fx = (v, d) => (typeof v === 'number' && Number.isFinite(v) ? v.toFixed(d) : null);
+const riskOf = (a) => a.risk_level || a.evidence?.risk_level || null;
+
+function Stat({ label, value, onClick }) {
+  const act = onClick ? { role: 'button', tabIndex: 0, onClick, onKeyDown: (e) => (e.key === 'Enter' || e.key === ' ') && onClick() } : {};
   return (
-    <div className="stat">
+    <div className={onClick ? 'stat click' : 'stat'} {...act}>
       <span>{label}</span>
       <b>{value}</b>
     </div>
   );
 }
 
-createRoot(document.getElementById('root')).render(<App />);
+createRoot(document.getElementById('root')).render(
+  <ErrorBoundary>
+    <App />
+  </ErrorBoundary>
+);
