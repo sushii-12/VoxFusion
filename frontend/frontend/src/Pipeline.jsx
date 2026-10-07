@@ -31,7 +31,7 @@ export function FusionDiagram() {
       <path d="M522 145H580" className="vfFlow" stroke="#7c6cff" strokeWidth="3" fill="none" />
       <circle cx="481" cy="145" r="42" fill="var(--surface)" stroke="#7c6cff" strokeWidth="2" />
       <circle cx="481" cy="145" r="54" fill="none" stroke="#7c6cff" opacity=".3" className="vfPulse" />
-      <text x="481" y="142" textAnchor="middle" fontWeight="600">FUSION</text><text className="mu" x="481" y="158" textAnchor="middle">35 · 30 · ±12</text>
+      <text x="481" y="150" textAnchor="middle" fontWeight="600">FUSION</text><text className="mu" x="481" y="158" textAnchor="middle"></text>
       <rect x="580" y="115" width="130" height="60" rx="12" fill="var(--surface2)" stroke="#7c6cff" />
       <text x="645" y="142" textAnchor="middle" fontWeight="600">THREAT</text><text className="mu" x="645" y="159" textAnchor="middle">assessment</text>
     </svg>

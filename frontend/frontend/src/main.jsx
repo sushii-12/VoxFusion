@@ -345,7 +345,6 @@ function App() {
       <aside className="sidebar">
         <div className="brand">
           <Logo /><b>VOXFUSION</b>
-          <span> / AI SUITE</span>
         </div>
         <nav ref={navRef} className="navWrap">
           <i className={ind.ready ? 'navInd ready' : 'navInd'} style={{ transform: `translateY(${ind.top}px)`, height: ind.h }} />
