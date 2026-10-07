@@ -1,4 +1,5 @@
 import React, { useEffect, useRef, useState } from 'react';
+import { createPortal } from 'react-dom';
 
 // Logo mark (waveform + fusion)
 export function Logo({ size = 28 }) {
@@ -31,7 +32,7 @@ export function FusionDiagram() {
       <path d="M522 145H580" className="vfFlow" stroke="#7c6cff" strokeWidth="3" fill="none" />
       <circle cx="481" cy="145" r="42" fill="var(--surface)" stroke="#7c6cff" strokeWidth="2" />
       <circle cx="481" cy="145" r="54" fill="none" stroke="#7c6cff" opacity=".3" className="vfPulse" />
-      <text x="481" y="150" textAnchor="middle" fontWeight="600">FUSION</text><text className="mu" x="481" y="158" textAnchor="middle"></text>
+      <text x="481" y="150" textAnchor="middle" fontWeight="600">FUSION</text>
       <rect x="580" y="115" width="130" height="60" rx="12" fill="var(--surface2)" stroke="#7c6cff" />
       <text x="645" y="142" textAnchor="middle" fontWeight="600">THREAT</text><text className="mu" x="645" y="159" textAnchor="middle">assessment</text>
     </svg>
@@ -180,4 +181,75 @@ export class ErrorBoundary extends React.Component {
       </div>
     );
   }
+}
+
+/* AASIST-only (baseline) diagram: one signal -> threat assessment */
+export function BaselineDiagram({ level = 'LOW' }) {
+  const RM = typeof matchMedia !== 'undefined' && matchMedia('(prefers-reduced-motion: reduce)').matches;
+  const oc = level === 'HIGH' ? '#ff5d6c' : level === 'MEDIUM' ? '#f2b53d' : '#2fd18a';
+  const d = 'M250 70 H470';
+  return (
+    <svg className="vfSvg" viewBox="0 0 720 140" width="100%" role="img" aria-label="AASIST single-model detection leading to the threat assessment">
+      <rect x="90" y="40" width="160" height="60" rx="12" fill="var(--surface2)" stroke="#7c6cff" />
+      <text x="170" y="66" textAnchor="middle" fontWeight="600">AASIST</text><text className="mu" x="170" y="84" textAnchor="middle">deepfake</text>
+      <path d={d} className="vfFlow" fill="none" stroke="#7c6cff" strokeWidth="3" />
+      {!RM && <circle r="3.6" fill="#35d0e6"><animateMotion dur="2s" repeatCount="indefinite" path={d} /></circle>}
+      <rect x="470" y="40" width="160" height="60" rx="12" fill="var(--surface2)" stroke={oc} />
+      <text x="550" y="66" textAnchor="middle" fontWeight="600">THREAT</text><text className="mu" x="550" y="84" textAnchor="middle">assessment</text>
+    </svg>
+  );
+}
+
+/* ---------- Centered pop-up modal (used by the Overview model cards) ---------- */
+export function Modal({ open, title, onClose, children }) {
+  useEffect(() => {
+    if (!open) return;
+    const k = (e) => e.key === 'Escape' && onClose();
+    addEventListener('keydown', k);
+    const prev = document.body.style.overflow;
+    document.body.style.overflow = 'hidden';
+    return () => { removeEventListener('keydown', k); document.body.style.overflow = prev; };
+  }, [open, onClose]);
+  const glow = (e) => {
+    const r = e.currentTarget.getBoundingClientRect();
+    e.currentTarget.style.setProperty('--mx', e.clientX - r.left + 'px');
+    e.currentTarget.style.setProperty('--my', e.clientY - r.top + 'px');
+  };
+  return createPortal(
+    <>
+      <div className={'vfScrim' + (open ? ' open' : '')} onClick={onClose} />
+      <div className={'vfModal' + (open ? ' open' : '')} role="dialog" aria-modal="true" aria-label={title} inert={!open} onPointerMove={glow}>
+        <button className="vfModalX ghost" onClick={onClose} aria-label="Close">✕</button>
+        {children}
+      </div>
+    </>,
+    document.body
+  );
+}
+
+const MODEL_DETAIL = {
+  'AASIST': { key: 'aasist', tag: 'Deepfake detection', blurb: 'Acoustic countermeasure that listens for artifacts left by synthetic or cloned speech.', makes: ['Deepfake score', 'Bona-fide score', 'Raw CM score', 'Spoof / bona-fide prediction'], fusion: 'Supplies the main synthetic-audio signal to the fusion engine. It is also the single model used by the AASIST-only baseline.' },
+  'ECAPA-TDNN': { key: 'ecapa', tag: 'Speaker verification', blurb: 'Compares the voice in the recording against the enrolled reference samples of the selected family member.', makes: ['Similarity score', 'Match / not verified status', 'Reference speaker comparison'], fusion: 'Acts as a contextual modifier: it adjusts the assessment when synthetic-audio evidence is present, rather than voting on its own.' },
+  'Whisper (small)': { key: 'whisper', tag: 'Speech transcription', blurb: 'Speech recognition that converts the call audio into text and detects the spoken language.', makes: ['Transcript', 'Detected language', 'Language probability'], fusion: 'Provides the transcript that both scam-intent models read. It does not score risk by itself.' },
+  'Scam Intent V1': { key: 'scam_intent_v1', tag: 'Rule-based intent', blurb: 'Rule-based detector for urgency, pressure and extortion patterns in the transcript.', makes: ['Matched scam categories', 'Intent score (0-100)', 'Risk level'], fusion: 'Contributes the rule-based scam-intent signal to the fusion engine.' },
+  'Scam Intent V2': { key: 'scam_intent_v2', tag: 'ML intent classifier', blurb: 'TF-IDF + Logistic Regression classifier that estimates how likely the transcript is a scam.', makes: ['ML scam probability', 'Intent score (0-100)', 'Risk level'], fusion: 'Contributes the machine-learned scam-intent signal alongside V1.' },
+  'Fusion Engine': { key: 'fusion', tag: 'Interpretable fusion', blurb: 'Combines every available signal into one explainable threat assessment.', makes: ['Risk score (0-100)', 'LOW / MEDIUM / HIGH level', 'Key factors', 'Evidence points'], fusion: 'Provisional, experimental synthesis. Its output is not a calibrated probability or an identity determination.' },
+};
+
+export function ModelDetail({ name, health }) {
+  const d = MODEL_DETAIL[name];
+  if (!d) return null;
+  const st = health?.models ? (health.models[d.key] ? 'Loaded' : 'Not loaded') : 'Checking…';
+  return (
+    <div>
+      <div className="vfModalTag">{d.tag}</div>
+      <h2 style={{ margin: '6px 0 10px', fontSize: 30 }}>{name}</h2>
+      <span className={'vfChip ' + (st === 'Loaded' ? 'ok' : st === 'Not loaded' ? 'bad' : '')}><i />{st}</span>
+      <p className="vfModalP">{d.blurb}</p>
+      <div className="vfTiles">
+        <div className="vfTile"><h4>What it produces</h4><ul>{d.makes.map((x) => <li key={x}>{x}</li>)}</ul></div>
+        <div className="vfTile"><h4>Role in the pipeline</h4><p>{d.fusion}</p></div>
+      </div>
+    </div>
+  );
 }

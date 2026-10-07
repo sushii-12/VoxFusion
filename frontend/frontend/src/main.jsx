@@ -3,7 +3,7 @@ import { createRoot } from 'react-dom/client';
 import './styles.css';
 import './premium.css';
 import Background from './Background.jsx';
-import { Logo, FusionDiagram, PipelineBusy, AnimatedNumber, Drawer, MODEL_INFO, UploadZone, SampleAudio, ErrorBoundary } from './Pipeline.jsx';
+import { Logo, FusionDiagram, BaselineDiagram, PipelineBusy, AnimatedNumber, Drawer, Modal, ModelDetail, MODEL_INFO, UploadZone, SampleAudio, ErrorBoundary } from './Pipeline.jsx';
 
 const API = 'http://127.0.0.1:8001';
 
@@ -51,15 +51,20 @@ function App() {
   const [infoModel, setInfoModel] = useState(null);
   const [histItem, setHistItem] = useState(null);
   const navRef = useRef(null);
-  const [ind, setInd] = useState({ top: 0, h: 0, ready: false });
+  const [ind, setInd] = useState({ left: 0, w: 0, ready: false });
   useLayoutEffect(() => {
-    const place = () => {
-      const el = navRef.current?.querySelector('.nav.active');
-      if (el) setInd((p) => ({ top: el.offsetTop, h: el.offsetHeight, ready: p.ready || p.h > 0 }));
+    const place = (scroll) => {
+      const nav = navRef.current;
+      const el = nav?.querySelector('.nav.active');
+      if (!el) return;
+      setInd((p) => ({ left: el.offsetLeft, w: el.offsetWidth, ready: p.ready || p.w > 0 }));
+      if (scroll && nav.scrollWidth > nav.clientWidth) nav.scrollTo({ left: el.offsetLeft - 24, behavior: 'smooth' });
     };
-    place();
-    addEventListener('resize', place);
-    return () => removeEventListener('resize', place);
+    place(true);
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+    const onResize = () => place(false);
+    addEventListener('resize', onResize);
+    return () => removeEventListener('resize', onResize);
   }, [page]);
 
   useEffect(() => {
@@ -221,6 +226,7 @@ function App() {
       fd.append('mode', analysisMode);
       const res = await api(`/api/analyze/${selectedSampleId}`, { method: 'POST', body: fd });
       setActiveAnalysis(res);
+      scrollToResult();
       notify('Analysis complete.');
       await load();
     } catch (e) {
@@ -235,6 +241,7 @@ function App() {
     try {
       const data = await api(`/api/analyses/${analysisId}`);
       setActiveAnalysis(data);
+      scrollToResult();
     } catch (e) {
       notify(e.message);
     } finally {
@@ -342,29 +349,41 @@ function App() {
   return (
     <div className="app">
       <Background />
-      <aside className="sidebar">
-        <div className="brand">
-          <Logo /><b>VOXFUSION</b>
+      <header className="topnav">
+        <div className="topnavInner">
+          <div className="brand">
+            <Logo />
+            <b>VOXFUSION</b>
+          </div>
+          <nav ref={navRef} className="navWrap" aria-label="Main">
+            <i className={ind.ready ? 'navInd ready' : 'navInd'} style={{ transform: `translateX(${ind.left}px)`, width: ind.w }} />
+            {['Overview', 'Family', 'Voice Samples', 'Analyses', 'Comparisons', 'Settings'].map((x) => (
+              <button key={x} onClick={() => setPage(x)} className={page === x ? 'nav active' : 'nav'} aria-current={page === x ? 'page' : undefined}>
+                {x}
+              </button>
+            ))}
+          </nav>
+          <div className="navRight">
+            <span className="backend" title={health?.status === 'ok' ? 'Backend online' : 'Backend offline'}>
+              <span className={health?.status === 'ok' ? 'dot on' : 'dot'}></span>
+              <span className="backendText">{health?.status === 'ok' ? 'Backend online' : 'Backend offline'}</span>
+            </span>
+            <span className="badge">{modelReady ? 'MODELS CONNECTED' : 'INITIALIZING'}</span>
+          </div>
         </div>
-        <nav ref={navRef} className="navWrap">
-          <i className={ind.ready ? 'navInd ready' : 'navInd'} style={{ transform: `translateY(${ind.top}px)`, height: ind.h }} />
-          {['Overview', 'Family', 'Voice Samples', 'Analyses', 'Comparisons', 'Settings'].map((x) => (
-            <button key={x} onClick={() => setPage(x)} className={page === x ? 'nav active' : 'nav'}>
-              {x}
-            </button>
-          ))}
-        </nav>
-        <div className="backend">
-          <span className={health?.status === 'ok' ? 'dot on' : 'dot'}></span> Backend{' '}
-          {health?.status === 'ok' ? 'online' : 'offline'}
-        </div>
-      </aside>
+      </header>
 
       <main className="main">
         <div className="topline">
           <span>{page.toUpperCase()}</span>
-          <span className="badge">{modelReady ? 'MODELS CONNECTED' : 'INITIALIZING'}</span>
-        </div>
+          </div>
+        {health && !modelReady && (
+          <div className="panel" role="alert" style={{ marginTop: 20, borderLeft: '4px solid var(--warning)' }}>
+            <b>Some AI models are not loaded:</b>{' '}
+            {Object.entries(health.models || {}).filter(([, v]) => !v).map(([k]) => k).join(', ')}.
+            <div className="note">Until they load, analysis scores will be empty or 0. Check the backend terminal for the error message.</div>
+          </div>
+        )}
 
         {/* OVERVIEW PAGE */}
         {page === 'Overview' && (
@@ -712,9 +731,9 @@ function App() {
         )}
 
         {message && <div className="toast">{message}</div>}
-      <Drawer open={!!infoModel} title={infoModel || ''} onClose={() => setInfoModel(null)}>
-          <p className="note">{MODEL_INFO[infoModel]}</p>
-        </Drawer>
+      <Modal open={!!infoModel} title={infoModel || ''} onClose={() => setInfoModel(null)}>
+          {infoModel && <ModelDetail name={infoModel} health={health} />}
+        </Modal>
         <Drawer open={!!histItem} title={histItem ? `Analysis #${histItem.id}` : ''} onClose={() => setHistItem(null)}>
           {histItem && (
             <>
@@ -727,7 +746,7 @@ function App() {
                   .filter(([, v]) => v !== null && v !== undefined)
                   .map(([k, v]) => (<React.Fragment key={k}><span>{k}</span><b>{String(v)}</b></React.Fragment>))}
               </div>
-              <button className="wideButton" onClick={() => { const id = histItem.id; setHistItem(null); viewAnalysis(id).then(() => window.scrollTo({ top: 0, behavior: 'smooth' })); }}>Open full report</button>
+              <button className="wideButton" onClick={() => { const id = histItem.id; setHistItem(null); viewAnalysis(id); }}>Open full report</button>
               <button className="wideButton dangerButton" onClick={() => { const id = histItem.id; setHistItem(null); deleteAnalysis(id); }}>Delete analysis</button>
             </>
           )}
@@ -752,9 +771,10 @@ function AnalysisDetailView({ analysis, onClose }) {
   const transcript = whisper.transcript || evidenceData.transcript || '';
   const riskLevel = analysis.risk_level || evidenceData.risk_level || 'LOW';
   const riskScore = analysis.risk_score !== undefined ? analysis.risk_score : (evidenceData.risk_score ?? 0);
+  const baseline = analysis.mode === 'aasist_only';
 
   return (
-    <div className="panel" style={{ marginTop: '24px', borderLeft: '4px solid var(--text)' }}>
+    <div id="analysisResult" className="panel" style={{ marginTop: '24px', borderLeft: '4px solid var(--text)' }}>
       <div className="resultHeader">
         <div>
           <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
@@ -768,18 +788,32 @@ function AnalysisDetailView({ analysis, onClose }) {
         <div style={{ display: 'flex', alignItems: 'center', gap: '20px' }}>
           <div className="resultScoreBlock">
             <b><AnimatedNumber value={riskScore} /></b>
-            <span>/ 100 Fusion Score</span>
+            <span>{baseline ? '/ 100 Baseline Score' : '/ 100 Fusion Score'}</span>
           </div>
           {onClose && <button className="ghost" onClick={onClose}>Close</button>}
         </div>
       </div>
 
+      {[['AASIST', aasist], ['ECAPA-TDNN', ecapa], ['Whisper', whisper]].filter(([, r]) => r.available === false).map(([n, r]) => (
+        <div className="disclaimerBox" key={n} role="alert" style={{ borderColor: 'var(--danger)', color: 'var(--danger)', marginBottom: 14 }}>
+          <b>{n} did not run:</b> {r.detail || 'model unavailable'}. The scores below do not include this model.
+        </div>
+      ))}
       {/* Model Cards Grid */}
-      <h3>Sub-Model Assessments</h3>
+      {baseline ? (
+        <>
+          <h3>AASIST Baseline Assessment</h3>
+          <BaselineDiagram level={riskLevel} />
+        </>
+      ) : (
+        <>
+          <h3>Sub-Model Assessments</h3>
       <h3 style={{ marginTop: 8 }}>How the signals converge</h3>
       <FusionDiagram />
       <p className="note">AASIST contributes up to 35 points, scam intent up to 30, and ECAPA-TDNN acts as a contextual modifier. Weights are provisional.</p>
-      <div className="analysisCardsGrid">
+        </>
+      )}
+      <div className="analysisCardsGrid" style={baseline ? { gridTemplateColumns: 'minmax(0, 560px)' } : undefined}>
         {/* AASIST */}
         <div className="card">
           <h4>AASIST Deepfake Detector</h4>
@@ -797,7 +831,9 @@ function AnalysisDetailView({ analysis, onClose }) {
           </div>
         </div>
 
-        {/* ECAPA */}
+        {!baseline && (
+          <>
+          {/* ECAPA */}
         <div className="card">
           <h4>ECAPA-TDNN Speaker Verification</h4>
           <div className="cardMetric" style={{ textTransform: 'capitalize' }}>
@@ -851,16 +887,22 @@ function AnalysisDetailView({ analysis, onClose }) {
           </div>
           <div className="cardDesc">Score: {fx(v2.scam_intent_score, 1) ?? 0} / 100</div>
         </div>
+          </>
+        )}
       </div>
 
       {/* Transcript Block */}
+      {!baseline && (
+        <>
       <h3 style={{ marginTop: '24px' }}>Speech Transcript</h3>
       <div className="transcriptQuote">
         {transcript ? `“${transcript}”` : <em>No transcript available for this recording.</em>}
       </div>
+        </>
+      )}
 
       {/* Explanatory Reasons and Evidence */}
-      <h3 style={{ marginTop: '24px' }}>Fusion Reasoning & Evidence</h3>
+      <h3 style={{ marginTop: '24px' }}>{baseline ? 'Baseline Reasoning & Evidence' : 'Fusion Reasoning & Evidence'}</h3>
       {reasons.length > 0 && (
         <div>
           <h4 style={{ margin: '10px 0 5px', fontSize: '13px', color: 'var(--muted)' }}>Key Factors:</h4>
@@ -884,8 +926,10 @@ function AnalysisDetailView({ analysis, onClose }) {
       )}
 
       <div className="disclaimerBox">
-        <b>Evaluation Notice:</b> The final assessment is experimental evidence based on provisional multi-modal weights.
-        Raw scores and composite indices are not calibrated probabilities or legal identity determinations.
+        <b>Evaluation Notice:</b>{' '}
+        {baseline
+          ? 'This baseline uses a single acoustic countermeasure (AASIST). Raw scores are not calibrated probabilities or legal identity determinations.'
+          : 'The final assessment is experimental evidence based on provisional multi-modal weights. Raw scores and composite indices are not calibrated probabilities or legal identity determinations.'}
       </div>
     </div>
   );
@@ -977,6 +1021,7 @@ function Settings({ theme, setTheme, onExport, onImport, onClear, busy }) {
   );
 }
 
+const scrollToResult = () => setTimeout(() => document.getElementById('analysisResult')?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 80);
 const fx = (v, d) => (typeof v === 'number' && Number.isFinite(v) ? v.toFixed(d) : null);
 const riskOf = (a) => a.risk_level || a.evidence?.risk_level || null;
 
