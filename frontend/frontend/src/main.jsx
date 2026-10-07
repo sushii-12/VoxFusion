@@ -51,15 +51,20 @@ function App() {
   const [infoModel, setInfoModel] = useState(null);
   const [histItem, setHistItem] = useState(null);
   const navRef = useRef(null);
-  const [ind, setInd] = useState({ top: 0, h: 0, ready: false });
+  const [ind, setInd] = useState({ left: 0, w: 0, ready: false });
   useLayoutEffect(() => {
-    const place = () => {
-      const el = navRef.current?.querySelector('.nav.active');
-      if (el) setInd((p) => ({ top: el.offsetTop, h: el.offsetHeight, ready: p.ready || p.h > 0 }));
+    const place = (scroll) => {
+      const nav = navRef.current;
+      const el = nav?.querySelector('.nav.active');
+      if (!el) return;
+      setInd((p) => ({ left: el.offsetLeft, w: el.offsetWidth, ready: p.ready || p.w > 0 }));
+      if (scroll && nav.scrollWidth > nav.clientWidth) nav.scrollTo({ left: el.offsetLeft - 24, behavior: 'smooth' });
     };
-    place();
-    addEventListener('resize', place);
-    return () => removeEventListener('resize', place);
+    place(true);
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+    const onResize = () => place(false);
+    addEventListener('resize', onResize);
+    return () => removeEventListener('resize', onResize);
   }, [page]);
 
   useEffect(() => {
@@ -342,29 +347,41 @@ function App() {
   return (
     <div className="app">
       <Background />
-      <aside className="sidebar">
-        <div className="brand">
-          <Logo /><b>VOXFUSION</b>
+      <header className="topnav">
+        <div className="topnavInner">
+          <div className="brand">
+            <Logo />
+            <b>VOXFUSION</b>
+          </div>
+          <nav ref={navRef} className="navWrap" aria-label="Main">
+            <i className={ind.ready ? 'navInd ready' : 'navInd'} style={{ transform: `translateX(${ind.left}px)`, width: ind.w }} />
+            {['Overview', 'Family', 'Voice Samples', 'Analyses', 'Comparisons', 'Settings'].map((x) => (
+              <button key={x} onClick={() => setPage(x)} className={page === x ? 'nav active' : 'nav'} aria-current={page === x ? 'page' : undefined}>
+                {x}
+              </button>
+            ))}
+          </nav>
+          <div className="navRight">
+            <span className="backend" title={health?.status === 'ok' ? 'Backend online' : 'Backend offline'}>
+              <span className={health?.status === 'ok' ? 'dot on' : 'dot'}></span>
+              <span className="backendText">{health?.status === 'ok' ? 'Backend online' : 'Backend offline'}</span>
+            </span>
+            <span className="badge">{modelReady ? 'MODELS CONNECTED' : 'INITIALIZING'}</span>
+          </div>
         </div>
-        <nav ref={navRef} className="navWrap">
-          <i className={ind.ready ? 'navInd ready' : 'navInd'} style={{ transform: `translateY(${ind.top}px)`, height: ind.h }} />
-          {['Overview', 'Family', 'Voice Samples', 'Analyses', 'Comparisons', 'Settings'].map((x) => (
-            <button key={x} onClick={() => setPage(x)} className={page === x ? 'nav active' : 'nav'}>
-              {x}
-            </button>
-          ))}
-        </nav>
-        <div className="backend">
-          <span className={health?.status === 'ok' ? 'dot on' : 'dot'}></span> Backend{' '}
-          {health?.status === 'ok' ? 'online' : 'offline'}
-        </div>
-      </aside>
+      </header>
 
       <main className="main">
         <div className="topline">
           <span>{page.toUpperCase()}</span>
-          <span className="badge">{modelReady ? 'MODELS CONNECTED' : 'INITIALIZING'}</span>
-        </div>
+          </div>
+        {health && !modelReady && (
+          <div className="panel" role="alert" style={{ marginTop: 20, borderLeft: '4px solid var(--warning)' }}>
+            <b>Some AI models are not loaded:</b>{' '}
+            {Object.entries(health.models || {}).filter(([, v]) => !v).map(([k]) => k).join(', ')}.
+            <div className="note">Until they load, analysis scores will be empty or 0. Check the backend terminal for the error message.</div>
+          </div>
+        )}
 
         {/* OVERVIEW PAGE */}
         {page === 'Overview' && (
@@ -774,6 +791,11 @@ function AnalysisDetailView({ analysis, onClose }) {
         </div>
       </div>
 
+      {[['AASIST', aasist], ['ECAPA-TDNN', ecapa], ['Whisper', whisper]].filter(([, r]) => r.available === false).map(([n, r]) => (
+        <div className="disclaimerBox" key={n} role="alert" style={{ borderColor: 'var(--danger)', color: 'var(--danger)', marginBottom: 14 }}>
+          <b>{n} did not run:</b> {r.detail || 'model unavailable'}. The scores below do not include this model.
+        </div>
+      ))}
       {/* Model Cards Grid */}
       <h3>Sub-Model Assessments</h3>
       <h3 style={{ marginTop: 8 }}>How the signals converge</h3>
