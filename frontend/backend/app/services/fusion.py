@@ -78,9 +78,20 @@ class ScamIntentAdapter:
             )
 
     def analyze_v2(self, transcript: str) -> ScamIntentV2Result:
+        # Analyze V2 intent, handling possible error statuses from the analyzer.
         try:
             res = self.v2.analyze(transcript or "")
-            return ScamIntentV2Result(
+            # Diagnostic prints
+            print("[1] TRANSCRIPT", repr(transcript))
+            print("[2] DIRECT V2 RESULT", repr(res))
+            # If the analyzer reports an error status, treat the result as unavailable.
+            if res.get("status") != "success":
+                return ScamIntentV2Result(
+                    available=False,
+                    status=res.get("status", "error"),
+                    detail=res.get("message", "V2 analysis error"),
+                )
+            result_obj = ScamIntentV2Result(
                 scam_intent_score=float(res.get("scam_intent_score", 0.0)),
                 scam_probability=float(res.get("scam_probability", 0.0)),
                 risk_level=res.get("risk_level", "LOW"),
@@ -88,10 +99,12 @@ class ScamIntentAdapter:
                 available=True,
                 detail=f"V2 Risk: {res.get('risk_level', 'LOW')} (Score: {res.get('scam_intent_score', 0):.1f})",
             )
+            print("[3] V2 RESULT OBJECT", result_obj.scam_intent_score, result_obj.scam_probability, result_obj.risk_level, result_obj.status, result_obj.available)
+            return result_obj
         except Exception as e:
             return ScamIntentV2Result(
                 available=False,
-                detail=f"V2 Intent analysis error: {str(e)}",
+                detail=f"V2 Intent analysis exception: {str(e)}",
             )
 
 
@@ -141,14 +154,19 @@ class FusionAdapter:
 
         # Build combined intent payload carrying both V1 indicators and V2 probability
         intent_dict = {
-            "scam_intent_score": v2_result.scam_intent_score if v2_result.available else v1_result.scam_intent_score,
-            "risk_level": v2_result.risk_level if v2_result.available else v1_result.risk_level,
+            "scam_intent_score": v1_result.scam_intent_score,
+            "risk_level": v1_result.risk_level,
             "matched_categories": v1_result.matched_categories,
             "matched_indicators": v1_result.matched_indicators,
-            "scam_probability": v2_result.scam_probability,
-            "status": v2_result.status if v2_result.available else "success",
+            # Include V2 fields only if V2 analysis succeeded
+            "scam_probability": v2_result.scam_probability if v2_result.available else None,
+            "v2_score": v2_result.scam_intent_score if v2_result.available else None,
+            "v2_risk_level": v2_result.risk_level if v2_result.available else None,
+            "status": v2_result.status if v2_result.available else "unavailable",
         }
 
+        # Diagnostic print for fusion input
+        print("[4] FUSION V2 INPUT", intent_dict)
         fused = self.engine.analyze(
             speaker_result=speaker_dict,
             deepfake_result=deepfake_dict,
